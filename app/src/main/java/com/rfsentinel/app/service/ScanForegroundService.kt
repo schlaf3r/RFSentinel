@@ -207,7 +207,7 @@ class ScanForegroundService : Service() {
         fun mapHidden(context: Context) { mapViewers.updateAndGet { (it - 1).coerceAtLeast(0) }; refreshLocation(context) }
 
         /** Re-applies the location mode of a running scan (never starts one). */
-        private fun refreshLocation(context: Context) {
+        fun refreshLocation(context: Context) {
             // The debug demo pretends to scan: never start real location updates for it.
             if (!isRunning || com.rfsentinel.app.ui.DemoData.fakeLocation != null) return
             runCatching {
@@ -570,6 +570,8 @@ class ScanForegroundService : Service() {
             com.rfsentinel.app.esp.MeshBle.start(this, addr) { list -> pipeline.post { list.forEach(::processEsp) } }
         } ?: com.rfsentinel.app.esp.MeshBle.stop()
         updateLink()
+        // Settings › Data › Record a WiGLE log: read before the location mode is chosen (it wants frequent fixes).
+        com.rfsentinel.app.util.WigleLog.load(this)
         updateLocationUpdates()
         startHousekeeping()
         startCellChecks()
@@ -759,7 +761,7 @@ class ScanForegroundService : Service() {
     }
 
     /**
-     * Location is needed for GPS tagging, follower alerts, trace recording and
+     * Location is needed for GPS tagging, follower alerts, trace recording, a WiGLE log and
      * known-camera warnings. While recording or watching for cameras, GPS fixes
      * come every ~3 s / 5 m; otherwise balanced fixes every ~20 s / 25 m to save battery.
      * While a flagged device is in range (pinpointing on), every second.
@@ -769,10 +771,11 @@ class ScanForegroundService : Service() {
         val locating = Prefs.pinpointFlagged(this) && System.currentTimeMillis() < locatingUntil
         val wanted = hasFineLocation() &&
             (Prefs.gpsTaggingEnabled(this) || Prefs.followerAlerts(this) || TripRecorder.isRecording || knownAlprActive() ||
-                mapVisible || onlineActive() || locating)
+                mapVisible || onlineActive() || locating || com.rfsentinel.app.util.WigleLog.enabled)
         // Frequent fixes while recording a trace or watching for known cameras
         // (at highway speed a 20 s interval could skip right past one).
-        val fast = TripRecorder.isRecording || knownAlprActive() || mapVisible || locating
+        // A WiGLE log too: WiGLE places each network from where it was heard, so it needs fixes as often as a trace.
+        val fast = TripRecorder.isRecording || knownAlprActive() || mapVisible || locating || com.rfsentinel.app.util.WigleLog.enabled
         val mode = when { locating -> 2; fast -> 1; else -> 0 }
         val lm = getSystemService(LOCATION_SERVICE) as LocationManager
         if (locationListening && (!wanted || mode != locationMode)) {
@@ -922,6 +925,8 @@ class ScanForegroundService : Service() {
         val loc = if (lora) null else if (via != null) peerAt else lastLocation?.takeIf { usableForPlacing(it) }
         // Heard by another Sentinel: placed where that Sentinel was.
         val geo = if (via != null) loc?.let { DeviceRegistry.GeoSample(now, it.latitude, it.longitude) } else loc?.let { placeNow(it, now) }
+        // Settings › Data › Record a WiGLE log: what this phone and its own hardware heard, where it was.
+        if (via == null && !lora) com.rfsentinel.app.util.WigleLog.onAdvert(this, a, loc, WhitelistCache.contains(mac))
         val here = lastLocation?.let { DeviceRegistry.GeoSample(now, it.latitude, it.longitude) }
         val isFirst = DeviceRegistry.report(a, c.hits, c.identity, c.vendor, remoteId, geo, now, broadcast, here, lora, via != null)
         if (isFirst) serviceScope.launch { loadHistory(mac) }
@@ -2608,6 +2613,7 @@ class ScanForegroundService : Service() {
         com.rfsentinel.app.usb.KarmaWatch.onAttack = null
         com.rfsentinel.app.usb.KarmaWatch.clear()
         com.rfsentinel.app.usb.PcapRecorder.stop()
+        com.rfsentinel.app.util.WigleLog.close()
         locatingHandler.removeCallbacks(locatingCheck)
         com.rfsentinel.app.esp.EspBoards.stop(this)
         com.rfsentinel.app.usb.UsbWifi.stop(this)

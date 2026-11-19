@@ -949,6 +949,12 @@ object Prefs {
     /** Settings › Log everything the USB WiFi adapter hears. Off by default. */
     fun usbWifiLogAll(context: Context): Boolean = bool(context, "usb_wifi_log_all", false)
     fun setUsbWifiLogAll(context: Context, v: Boolean) = setBool(context, "usb_wifi_log_all", v)
+    /** Settings › Data › Record a WiGLE log while scanning ([WigleLog]). Off by default. */
+    fun wigleLog(context: Context): Boolean = bool(context, "wigle_log", false)
+    fun setWigleLog(context: Context, v: Boolean) = setBool(context, "wigle_log", v)
+    /** Settings › Data › WiGLE log: Bluetooth LE devices too, not only WiFi access points. Off by default. */
+    fun wigleLogBluetooth(context: Context): Boolean = bool(context, "wigle_log_ble", false)
+    fun setWigleLogBluetooth(context: Context, v: Boolean) = setBool(context, "wigle_log_ble", v)
     /** Scan Bluetooth with a USB adapter's Bluetooth part (dongle or combo adapter). */
     fun usbBluetooth(context: Context): Boolean = bool(context, "usb_bluetooth", true)
     fun setUsbBluetooth(context: Context, value: Boolean) = setBool(context, "usb_bluetooth", value)

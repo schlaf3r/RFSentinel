@@ -2229,6 +2229,105 @@ class SettingsActivity : AppCompatActivity() {
         }
         box.addView(infoRow(button, com.rfsentinel.app.probes.WigleUi.PRIVACY, "WiGLE account"),
             box.indexOfChild(binding.importHistoryButton))
+        setupWigleLog(box, box.indexOfChild(binding.importHistoryButton))
+    }
+
+    /** Settings > Data, under the WiGLE account: record a WiGLE log while scanning, upload it, share it. */
+    private fun setupWigleLog(box: android.view.ViewGroup, at: Int) {
+        val log = com.rfsentinel.app.util.WigleLog
+        val status = TextView(this).apply {
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.text_caption))
+            alpha = 0.8f
+        }
+        fun refresh() { status.text = log.status(this) }
+        val ble = SwitchMaterial(this).apply {
+            text = "Bluetooth LE devices too"
+            isChecked = Prefs.wigleLogBluetooth(this@SettingsActivity)
+            isEnabled = Prefs.wigleLog(this@SettingsActivity)
+            setOnCheckedChangeListener { _, on -> Prefs.setWigleLogBluetooth(this@SettingsActivity, on); log.bluetooth = on }
+        }
+        val record = SwitchMaterial(this).apply {
+            text = "Record a WiGLE log while scanning"
+            isChecked = Prefs.wigleLog(this@SettingsActivity)
+            setOnCheckedChangeListener { _, on ->
+                Prefs.setWigleLog(this@SettingsActivity, on)
+                log.enabled = on
+                if (!on) log.close()
+                ble.isEnabled = on
+                // Frequent GPS fixes while it records.
+                ScanForegroundService.refreshLocation(this@SettingsActivity)
+                refresh()
+            }
+        }
+        val upload = com.google.android.material.button.MaterialButton(this, null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            text = "Upload WiGLE logs"
+            setOnClickListener {
+                if (com.rfsentinel.app.online.Wigle.hasAccount(this@SettingsActivity)) uploadWigleLogs { refresh() }
+                else com.rfsentinel.app.probes.WigleUi.account(this@SettingsActivity) { uploadWigleLogs { refresh() } }
+            }
+        }
+        val share = com.google.android.material.button.MaterialButton(this, null,
+            android.R.attr.borderlessButtonStyle).apply {
+            text = "Share WiGLE logs"
+            setOnClickListener {
+                log.close()
+                val files = log.pending(this@SettingsActivity)
+                if (files.isEmpty()) Toast.makeText(this@SettingsActivity, "No WiGLE log waiting", Toast.LENGTH_SHORT).show()
+                else com.rfsentinel.app.util.Exporter.shareFiles(this@SettingsActivity, files, "text/csv",
+                    "RF Sentinel WiGLE logs", "Share WiGLE logs")
+                refresh()
+            }
+        }
+        val clear = com.google.android.material.button.MaterialButton(this, null,
+            android.R.attr.borderlessButtonStyle).apply {
+            text = "Delete uploaded WiGLE files"
+            setOnClickListener {
+                MaterialAlertDialogBuilder(this@SettingsActivity)
+                    .setMessage("Delete the WiGLE files already uploaded from this phone? WiGLE keeps its copy.")
+                    .setPositiveButton("Delete") { _, _ -> log.deleteUploaded(this@SettingsActivity); refresh() }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+        var i = at
+        box.addView(infoRow(record, WIGLE_LOG_INFO, "WiGLE log"), i++)
+        box.addView(infoRow(ble, "Also writes Bluetooth LE devices (WiGLE type BLE) with their company id. Most phones, " +
+            "earbuds and watches change their address every few minutes, so this adds many rows WiGLE can't link.", "Bluetooth LE in the WiGLE log")
+            .apply { setPadding((24 * resources.displayMetrics.density).toInt(), 0, 0, 0) }, i++)
+        box.addView(status, i++)
+        box.addView(upload, i++)
+        box.addView(share, i++)
+        box.addView(clear, i)
+        refresh()
+    }
+
+    /** Uploads every waiting WiGLE log, with a progress line, then says how each went. */
+    private fun uploadWigleLogs(after: () -> Unit) {
+        val line = TextView(this).apply {
+            val pad = (24 * resources.displayMetrics.density).toInt(); setPadding(pad, pad / 2, pad, 0)
+            text = "Closing the file being written…"
+        }
+        val progress = MaterialAlertDialogBuilder(this).setTitle("Uploading to WiGLE").setView(line).setCancelable(false).show()
+        lifecycleScope.launch {
+            val message = try {
+                val done = com.rfsentinel.app.online.WigleUpload.uploadAll(this@SettingsActivity) { s -> runOnUiThread { line.text = s } }
+                if (done.isEmpty()) "No WiGLE log waiting. Turn on Record a WiGLE log, scan with a GPS fix, then upload."
+                else done.joinToString("\n\n") { o -> "${o.file.name}\n${if (o.ok) "✓" else "✗"} ${o.message}" }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: com.rfsentinel.app.online.Wigle.Failure) {
+                e.message ?: "WiGLE couldn't take the upload"
+            } catch (e: Exception) {
+                "The upload stopped: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                runCatching { progress.dismiss() }
+            }
+            if (isFinishing || isDestroyed) return@launch
+            MaterialAlertDialogBuilder(this@SettingsActivity).setTitle("WiGLE upload").setMessage(message)
+                .setPositiveButton("OK", null).show()
+            after()
+        }
     }
 
     // ---- Live export (Settings > Data) ---------------------------------------------------
@@ -3670,3 +3769,13 @@ class SettingsActivity : AppCompatActivity() {
         return true
     }
 }
+
+/** Settings > Data > Record a WiGLE log: the ⓘ text. */
+private const val WIGLE_LOG_INFO = "While scanning, writes every WiFi access point this phone hears (its own WiFi scan, a USB WiFi " +
+    "adapter in monitor mode including 6 GHz, an ESP32 board) with your position to a WiGLE upload file " +
+    "(WigleWifi-1.6 CSV), for wigle.net's map. Needs a GPS fix: nothing is written without one, and GPS fixes " +
+    "come every few seconds while it records.\n\n" +
+    "Never written: client devices (laptops, phones), networks whose name ends in _nomap, and anything in your whitelist.\n\n" +
+    "Upload WiGLE logs sends the files to WiGLE with your WiGLE account, with the exact positions where each " +
+    "network was heard. WiGLE puts them on its public map under your name. Nothing is sent until you tap Upload. " +
+    "Share WiGLE logs hands the files to another app instead (to upload from wigle.net, or keep)."

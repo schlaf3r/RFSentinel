@@ -62,6 +62,9 @@ object Wigle {
 
     fun hasAccount(context: Context) = auth(context) != null
 
+    /** The account as a Basic Authorization header, for [WigleUpload]; null when none is saved. */
+    internal fun authHeader(context: Context): String? = auth(context)
+
     private fun auth(context: Context): String? {
         val name = SecureStore.get(context, NAME_KEY)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         val token = SecureStore.get(context, TOKEN_KEY)?.trim()?.takeIf { it.isNotEmpty() } ?: return null

@@ -4,4 +4,5 @@
     <files-path name="p25rec" path="p25rec/" />
     <files-path name="p25calls" path="p25calls/" />
     <files-path name="sdrraw" path="sdrraw/" />
+    <files-path name="wigle" path="wigle/" />
 </paths>
