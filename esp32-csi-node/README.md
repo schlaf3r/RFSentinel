@@ -5,7 +5,7 @@ and add each in the app; every board shows as its own motion signal.
 
 ## Flash
 1. Arduino IDE with the **esp32** board package (Espressif), or PlatformIO.
-2. Open `esp32_csi_node.ino`, set `WIFI_SSID` and `WIFI_PASS`.
+2. Open `esp32-csi-node.ino`, set `WIFI_SSID` and `WIFI_PASS`.
 3. Select your ESP32-S3 board, upload.
 4. Open Serial Monitor at 115200; it prints the board's IP.
 
