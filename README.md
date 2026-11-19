@@ -1,8 +1,8 @@
-<h1 align="center">RF Sentinel</h1>
-<h3 align="center">BLE &amp; WiFi police scanner for Android with wigle integration</h3>
+<h1 align="center">RF War Sentinel</h1>
+<h3 align="center">BLE &amp; WiFi police scanner for Android with direct upload scans to Wigle integration</h3>
 
 <p align="center">
-  Passively detects body cameras, license-plate cameras, patrol vehicles, drones,
+  Passively wardrive and detects body cameras, license-plate cameras, patrol vehicles, drones,
   trackers following you, camera glasses and fake cell tower signs from the
   signals they already broadcast. No root, no Termux, no account.
 </p>
