@@ -50,21 +50,16 @@ void onCsi(void* ctx, wifi_csi_info_t* info) {
 }
 
 void startCsi() {
-  // NOTE: wifi_csi_config_t changed between ESP32 Arduino core versions. The initializer below is for
-  // core 2.x / esp-idf 4.x. If it fails to compile on core 3.x (esp-idf 5.x), comment it out and use the
-  // 3.x block instead:
-  //   wifi_csi_config_t cfg = { };
-  //   cfg.acquire_csi_legacy = true; cfg.acquire_csi_ht20 = true; cfg.acquire_csi_ht40 = true;
-  //   cfg.val_scale_cfg = 0;
-  wifi_csi_config_t cfg = {
-    .lltf_en = true,
-    .htltf_en = true,
-    .stbc_htltf2_en = true,
-    .ltf_merge_en = true,
-    .channel_filter_en = true,
-    .manu_scale = false,
-    .shift = 0,
-  };
+  // Zero-init then set members by name, so field order/additions across ESP32 core versions don't
+  // break the build. These names are the long-standing ones (esp-idf 4.x and 5.x).
+  wifi_csi_config_t cfg = {};
+  cfg.lltf_en = true;
+  cfg.htltf_en = true;
+  cfg.stbc_htltf2_en = true;
+  cfg.ltf_merge_en = true;
+  cfg.channel_filter_en = true;
+  cfg.manu_scale = false;
+  cfg.shift = 0;
   esp_wifi_set_csi_config(&cfg);
   esp_wifi_set_csi_rx_cb(&onCsi, NULL);
   esp_wifi_set_csi(true);

@@ -28,7 +28,7 @@ jobs:
           arduino-cli compile \
             --fqbn esp32:esp32:esp32s3 \
             --export-binaries \
-            esp32-csi-node/esp32_csi_node.ino
+            esp32-csi-node
       - name: Collect binaries
         run: |
           mkdir -p firmware-out
