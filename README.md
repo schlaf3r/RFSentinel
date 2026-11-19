@@ -1,5 +1,5 @@
 <h1 align="center">RF Sentinel</h1>
-<h3 align="center">BLE &amp; WiFi police scanner for Android</h3>
+<h3 align="center">BLE &amp; WiFi police scanner for Android with wigle integration</h3>
 
 <p align="center">
   Passively detects body cameras, license-plate cameras, patrol vehicles, drones,
