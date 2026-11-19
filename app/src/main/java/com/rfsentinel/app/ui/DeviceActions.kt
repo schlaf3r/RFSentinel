@@ -140,6 +140,12 @@ object DeviceActions {
         // An access point's address is what WiGLE maps; a phone or laptop (client) isn't on it.
         if (snap?.advert?.isWifi == true && snap.advert.wifi?.client != true) {
             items += "Find on WiGLE" to { com.rfsentinel.app.probes.WigleUi.search(activity, mac) }
+            val freq = snap.advert.wifi?.frequencyMhz ?: 0
+            items += "WiFi Sense (motion)" to {
+                com.rfsentinel.app.sense.WifiSense.arm(mac, com.rfsentinel.app.util.WigleCsv.channelOf(freq) ?: 0,
+                    (ssidOf(snap) ?: "").ifBlank { snap.name ?: mac })
+                activity.startActivity(Intent(activity, WifiSenseActivity::class.java).putExtra(WifiSenseActivity.EXTRA_MAC, mac))
+            }
         }
         items += "Copy address" to { copy(activity, mac) }
 

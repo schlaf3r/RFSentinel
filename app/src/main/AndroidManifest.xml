@@ -115,6 +115,7 @@
         <activity android:name=".ouilist.OuiListActivity" android:exported="false" />
         <activity android:name=".probes.ProbeListActivity" android:exported="false" />
         <activity android:name=".ui.DetectionLogActivity" android:exported="false" />
+        <activity android:name=".ui.WifiSenseActivity" android:exported="false" />
         <activity android:name=".ui.DeviceHistoryActivity" android:exported="false" />
         <activity android:name=".ui.ThemeMakerActivity" android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode" />

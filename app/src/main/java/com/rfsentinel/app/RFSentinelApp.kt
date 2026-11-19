@@ -103,6 +103,8 @@ class RFSentinelApp : Application() {
         com.rfsentinel.app.ui.DeviceFilter.excludeAirTags = com.rfsentinel.app.util.Prefs.excludeAirTags(this)
         com.rfsentinel.app.ui.ThemeManager.install(this)
         com.rfsentinel.app.ui.ScreenAwake.install(this)
+        // WiFi Sense: connect to any saved ESP32 CSI nodes in the background.
+        com.rfsentinel.app.sense.CsiNodes.init(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(a: android.app.Activity) { visibleActivities++ }
             override fun onActivityStopped(a: android.app.Activity) { visibleActivities = (visibleActivities - 1).coerceAtLeast(0) }

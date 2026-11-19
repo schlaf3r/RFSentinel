@@ -17,7 +17,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Unit tests (WiGLE CSV format)
-        run: ./gradlew --no-daemon testFossDebugUnitTest --tests 'com.rfsentinel.app.util.WigleCsvTest'
+        run: ./gradlew --no-daemon testFossDebugUnitTest --tests 'com.rfsentinel.app.util.WigleCsvTest' --tests 'com.rfsentinel.app.sense.CsiMotionTest'
       - name: Build FOSS debug APK
         run: ./gradlew --no-daemon assembleFossDebug
       - uses: actions/upload-artifact@v4

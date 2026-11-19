@@ -927,6 +927,8 @@ class ScanForegroundService : Service() {
         val geo = if (via != null) loc?.let { DeviceRegistry.GeoSample(now, it.latitude, it.longitude) } else loc?.let { placeNow(it, now) }
         // Settings › Data › Record a WiGLE log: what this phone and its own hardware heard, where it was.
         if (via == null && !lora) com.rfsentinel.app.util.WigleLog.onAdvert(this, a, loc, WhitelistCache.contains(mac))
+        // WiFi Sense: feed the armed access point's RSSI to the motion sensor (no-op unless armed on this BSSID).
+        if (a.isWifi) com.rfsentinel.app.sense.WifiSense.onWifiAdvert(a)
         val here = lastLocation?.let { DeviceRegistry.GeoSample(now, it.latitude, it.longitude) }
         val isFirst = DeviceRegistry.report(a, c.hits, c.identity, c.vendor, remoteId, geo, now, broadcast, here, lora, via != null)
         if (isFirst) serviceScope.launch { loadHistory(mac) }

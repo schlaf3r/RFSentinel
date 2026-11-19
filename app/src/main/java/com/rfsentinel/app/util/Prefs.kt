@@ -720,6 +720,10 @@ object Prefs {
     private fun str(c: Context, key: String) = sp(c).getString(key, "").orEmpty()
     private fun setStr(c: Context, key: String, v: String) = sp(c).edit { putString(key, v) }
 
+    /** WiFi Sense: the saved ESP32 CSI nodes, as a JSON array string ([com.rfsentinel.app.sense.CsiNodes]). */
+    fun senseNodes(context: Context): String = str(context, "sense_nodes")
+    fun setSenseNodes(context: Context, json: String) = setStr(context, "sense_nodes", json)
+
     /** Report a radio from this many dB above the noise (15-50; 30 = the original sensitivity). */
     fun radioMinSnr(context: Context): Int = int(context, "radio_min_snr", com.rfsentinel.app.sdr.RadioWatch.DEFAULT_MIN_SNR)
         .coerceIn(com.rfsentinel.app.sdr.RadioWatch.MIN_SNR_SETTING, com.rfsentinel.app.sdr.RadioWatch.MAX_SNR_SETTING)
