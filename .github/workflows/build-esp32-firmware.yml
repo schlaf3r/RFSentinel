@@ -1,0 +1,40 @@
+# Compiles the ESP32-S3 CSI node sketch to flashable binaries and uploads them as an artifact.
+# Runs on push and by hand. The binaries feed the in-app / web flasher.
+name: Build ESP32-S3 firmware
+
+on:
+  push:
+    paths:
+      - 'esp32-csi-node/**'
+      - '.github/workflows/build-esp32-firmware.yml'
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s
+          echo "$PWD/bin" >> "$GITHUB_PATH"
+      - name: Install ESP32 core
+        run: |
+          arduino-cli config init
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Compile for ESP32-S3
+        run: |
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32s3 \
+            --export-binaries \
+            esp32-csi-node/esp32_csi_node.ino
+      - name: Collect binaries
+        run: |
+          mkdir -p firmware-out
+          find esp32-csi-node/build -name '*.bin' -exec cp {} firmware-out/ \;
+          ls -l firmware-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esp32s3-csi-firmware
+          path: firmware-out/*.bin
