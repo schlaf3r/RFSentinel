@@ -199,7 +199,7 @@ Everything the app does, grouped by area.
 - **Address-rotation linking:** keeps following a device when its Bluetooth address changes, including in Locate
 - **Live read card:** while Locate follows a device or a flagged device is being pinpointed, the map and the floating map show its flag, signal bar, dBm, rough distance and whether you're getting closer, with a ✕ to close it
 - **GPS dot:** the main screen's status shows red without a position, yellow when rougher than 20 m, green at 20 m or better
-- **Pinpointing:** a flagged device you pass from more than one side is placed where it most likely is, from its signal at every spot you passed (multilateration), with a circle it's very likely in; a straight road that can't tell the side gets a circle covering both. GPS runs precise every second while a flagged device is in range (Settings → Location, on by default)
+- **Pinpointing:** a flagged device you pass from more than one side is placed where it most likely is, from its signal at every spot you passed (multilateration), with a circle it's very likely in (a dot too once the circle is 35 m or less); a straight road that can't tell the side gets a circle covering both. GPS runs precise every second while a flagged device is in range (Settings → Location, on by default)
 - **Follower alerts:** a tracker or flagged device that stays with you (default 10 min and 800 m, adjustable) raises *may be following you*, and so does one that keeps turning up - heard at 3 or more places along your way within 2 hours, even with gaps between
 - **Watch this place** (Settings → Trackers & followers): leave the phone in one place (home, a hotel room); it learns every device around for 5 minutes, then reports what is new, gone, back or moving
 - **Remote ID drones** decoded live, with a *drone overhead* alert within 200 m
@@ -245,10 +245,11 @@ Everything the app does, grouped by area.
 <details>
 <summary><b>Map &amp; history</b></summary>
 
-- Vector map ([MapLibre](https://maplibre.org) with [OpenFreeMap](https://openfreemap.org), OpenStreetMap data; light and a readable night map with shops, landmarks, one-way arrows and highway shields; optional [Mapbox](https://www.mapbox.com) map) with your GPS trace and every device pinned where its signal peaked, flagged devices at their pinpointed spot with its circle (tap a spot to list everything heard there), the same filter chips as the list (including Waze, which draws reports as coloured dots by type), self-centering
+- Vector map ([MapLibre](https://maplibre.org) with [OpenFreeMap](https://openfreemap.org), OpenStreetMap data; light and a readable night map with shops, landmarks, one-way arrows and highway shields; optional [Mapbox](https://www.mapbox.com) map) with your GPS trace and every device pinned where its signal peaked, flagged devices at their pinpointed spot with its circle (devices at one spot merge into one dot with how many; tap it to list them), the same filter chips as the list (including Waze, which draws reports as coloured dots by type), self-centering
 - Optional **cell tower layer** (or the map's **Cells** chip): every tower seen while scanning, at the spot where its signal was strongest
 - **Record traces** of your route and the devices along it, with the screen off (with the network names each device asked for, when a USB adapter or Marauder board is plugged in)
-- **History map & timeline:** heatmap of where flagged equipment showed up, and when (hour of day, day of week)
+- **History map & timeline:** heatmap of where flagged equipment showed up, and when (hour of day, day of week); 30 min, 24 h, 7 and 30 days or all; sightings at one spot merge into one dot, faint for one and solid from three
+- **Status colours** (optional, Settings → Appearance): a box on flagged rows, green far to red very close, and CLOSING when the signal rises fast; alert rows still flash
 - **Sightings map:** on a device's page, every spot that device was heard, joined in time order for each encounter
 - The main screen's map and the full screen map show the same view (place, zoom, heading, tilt, following you) and the same place card and routes
 - **Snapshots:** menu ⋮ → *Save snapshot* keeps the device list exactly as shown, to look at again later (History → *Snapshots*, beside the recorded traces), on the map, or exported
@@ -278,7 +279,7 @@ Everything the app does, grouped by area.
 - The ALFA AWUS036ACS's light blinks with received traffic (Settings → External hardware switches it off, for the adapters whose light the app can control)
 - RTL-SDR and HackRF transmissions show on the **radar** too, for a minute after they were last heard
 - **P25 control channel** (experimental, RTL-SDR): finds the trunked-radio control channel and lists which talkgroups get a channel and when (Tools → P25 talkgroups), with alerts for talkgroups you watch, nearby radios, patches and radio GPS positions. With more than one SDR scan ticked (radio sweep, ADS-B, P25) the dongle takes turns
-- **Listen to P25 voice** (experimental, off by default): follows clear calls on talkgroups you pick and plays them; encrypted calls are never decoded. *Save played calls* keeps them to listen again (Tools → *Voice history*), and *Transcribe saved voice* turns them into text (Whisper in the full version, or Android 13+'s on-device speech recognition)
+- **Listen to P25 voice** (experimental, off by default): follows clear calls on talkgroups you pick and plays them; encrypted calls are never decoded. *Save played calls* keeps them to listen again, share or delete (Tools → *Voice history*), and *Transcribe saved voice* turns them into text (Whisper in the full version, or Android 13+'s on-device speech recognition)
 - **Play voice transmissions** (radio sweep, off by default): a new transmission is tuned to and played until it goes quiet: analog FM, clear P25, DMR and NXDN48 digital voice, and walkie-talkies on their real channel
 - **Tire-pressure sensors** (RTL-SDR, 315 / 433.92 MHz): the same car's wheels heard with you place after place means a vehicle following you, and a tire sensor heard again and again with a flagged Bluetooth device ties the two to one vehicle. Your own car's sensors are learned first
 - **TETRA hunting**: extra RTL-SDRs watch 380-385 MHz nonstop, with a main-screen bar (Far / Closer / Very close) and beeps
@@ -440,8 +441,10 @@ Your position, recorded traces, the devices heard around you and the known camer
   view** - tilted in perspective with your position low on the screen, like a car
   navigation app. The sun / moon button switches the map between light and dark, the gear
   opens the map settings. **Settings → Map** sets the **default zoom** (17 is close to Waze;
-  the 3D view pulls back from it as you speed up), the **3D view angle** (30° to 60°) and the
-  **map provider**: OpenFreeMap (free, no account) or Mapbox. The floating mini map always
+  the 3D view pulls back from it as you speed up), the **3D view angle** (0° to 60°, or 85° on Mapbox) and the
+  **map provider**: OpenFreeMap (free, no account) or Mapbox, with your own free Mapbox token
+  if you like (*Your Mapbox token*; if Mapbox refuses the map, it switches to OpenFreeMap and
+  says so). The floating mini map always
   uses OpenFreeMap.
 - **Cell towers** (Settings → *Map* → *Show cell towers*): towers seen while scanning,
   at the spot where your phone heard them strongest - an estimate, not the

@@ -301,6 +301,10 @@ object Prefs {
         sp(context).getString("list_size", null)?.let { v -> ListSize.entries.firstOrNull { it.name == v } } ?: ListSize.REGULAR
     fun setListSize(context: Context, value: ListSize) = sp(context).edit { putString("list_size", value.name) }
 
+    /** Settings › Appearance › Status colours: a distance box on flagged rows, next to their flashing (off by default). */
+    fun statusColours(context: Context): Boolean = bool(context, "status_colours", false)
+    fun setStatusColours(context: Context, on: Boolean) = sp(context).edit { putBoolean("status_colours", on) }
+
     fun fullscreen(context: Context): Boolean = bool(context, "fullscreen", false)
     fun setFullscreen(context: Context, value: Boolean) = setBool(context, "fullscreen", value)
 
@@ -758,6 +762,12 @@ object Prefs {
     /** Sentinel Link: what linked Sentinels hear is saved in this phone's History too. */
     fun saveLinked(context: Context) = bool(context, "save_linked", true)
     fun setSaveLinked(context: Context, v: Boolean) = setBool(context, "save_linked", v)
+    /** Each logged match also goes to TAK as a CoT marker ([com.rfsentinel.app.link.TakCot]), off by default. */
+    fun takOn(context: Context) = bool(context, "tak_on", false)
+    fun setTakOn(context: Context, v: Boolean) = setBool(context, "tak_on", v)
+    /** "host:port" for TAK, TAK's own multicast by default. */
+    fun takTarget(context: Context) = str(context, "tak_target").ifBlank { com.rfsentinel.app.link.TakCot.DEFAULT_TARGET }
+    fun setTakTarget(context: Context, v: String) = setStr(context, "tak_target", v.trim())
     /** Linked phones with a USB WiFi adapter each visit part of the channels ([com.rfsentinel.app.usb.UsbWifi.linkSplit]). */
     fun linkWifiShare(context: Context) = bool(context, "link_wifi_share", false)
     fun setLinkWifiShare(context: Context, v: Boolean) = setBool(context, "link_wifi_share", v)
@@ -1038,7 +1048,7 @@ object Prefs {
     /** The 3D driving view's tilt (degrees) at street speed; it leans further back by up to 10 degrees on fast roads. */
     const val MAP_TILT_DEFAULT = 50.0
     fun map3dTilt(context: Context): Double =
-        sp(context).getFloat("map_3d_tilt", MAP_TILT_DEFAULT.toFloat()).toDouble().coerceIn(30.0, 60.0)
+        sp(context).getFloat("map_3d_tilt", MAP_TILT_DEFAULT.toFloat()).toDouble().coerceIn(0.0, 85.0)
     fun setMap3dTilt(context: Context, value: Double) = sp(context).edit().putFloat("map_3d_tilt", value.toFloat()).apply()
 
     /** The marker for your position on the map ([com.rfsentinel.app.ui.MarkerArt]): its style, colour and size (1.0 = 56 dp tall). */

@@ -60,4 +60,14 @@ class MapEngineTest {
         }
         assertEquals(9, NightLabels.layers.size)
     }
+
+    @Test
+    fun mapboxIsRefusedOnlyOnAuthErrors() {
+        assertTrue(MapEngine.refusedBy("HTTP status code 401"))
+        assertTrue(MapEngine.refusedBy("Not Authorized - Invalid Token"))
+        assertTrue(MapEngine.refusedBy("Forbidden"))
+        assertTrue(!MapEngine.refusedBy("Failed to load style")) // a blip: Mapbox keeps the map
+        assertTrue(!MapEngine.refusedBy("Failed to load model: request cancelled"))
+        assertTrue(!MapEngine.refusedBy("tile 14/4011/401 timed out")) // a tile number, not a status
+    }
 }

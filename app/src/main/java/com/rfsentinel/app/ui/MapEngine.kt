@@ -18,9 +18,10 @@ import org.json.JSONObject
  */
 internal interface MapEngine {
 
-    enum class Provider(val key: String, val label: String) {
-        OPENFREEMAP("openfreemap", "OpenFreeMap (OpenStreetMap, free, no account)"),
-        MAPBOX("mapbox", "Mapbox");
+    /** [maxTilt]: the steepest 3D view angle the engine draws (MapLibre stops at 60°, Mapbox at 85°). */
+    enum class Provider(val key: String, val label: String, val maxTilt: Double) {
+        OPENFREEMAP("openfreemap", "OpenFreeMap (OpenStreetMap, free, no account)", 60.0),
+        MAPBOX("mapbox", "Mapbox", 85.0);
 
         companion object {
             fun parse(key: String?) = entries.firstOrNull { it.key == key } ?: OPENFREEMAP
@@ -110,17 +111,42 @@ internal interface MapEngine {
     fun follow(mode: Follow, topPaddingPx: Double?, tilt: Double, zoom: Double?, ms: Long)
     /** You panned away: the map stopped following. */
     var onFollowDismissed: (() -> Unit)?
+    /** The map provider refused the map (Mapbox: a revoked token...): [chosen] is OpenFreeMap from now on, swap to it. */
+    var onFailed: (() -> Unit)?
     /** Where the provider's logo and info button go: their top edge, at the start or (with [atEnd]) the end. */
     fun placeBranding(topPx: Int, atEnd: Boolean = false)
     /** The room the logo and info button take, in dp (width from the edge, height); none for a provider without them. */
     val brandingDp: Pair<Float, Float> get() = 0f to 0f
 
     companion object {
-        /** Mapbox needs the full build (the FOSS build leaves its SDK out) and a token in local.properties. */
-        val mapboxAvailable get() = MapboxSupport.INCLUDED && BuildConfig.MAPBOX_TOKEN.isNotEmpty()
+        /** Mapbox needs the full build (the FOSS build leaves its SDK out) and a token: the user's own, else the built-in one. */
+        fun mapboxAvailable(context: Context) = MapboxSupport.INCLUDED && mapboxToken(context).isNotEmpty() && !mapboxRefused
+
+        /** The user's own Mapbox token (Settings › Map), else the one built in from local.properties. */
+        fun mapboxToken(context: Context): String =
+            com.rfsentinel.app.util.SecureStore.get(context, MAPBOX_TOKEN_KEY)?.trim().orEmpty().ifEmpty { BuildConfig.MAPBOX_TOKEN }
+
+        /** Saves the user's own token ("" goes back to the built-in one) and gives Mapbox another try. */
+        fun setMapboxToken(context: Context, token: String) {
+            com.rfsentinel.app.util.SecureStore.put(context, MAPBOX_TOKEN_KEY, token.trim().ifEmpty { null })
+            mapboxRefused = false
+        }
+
+        private const val MAPBOX_TOKEN_KEY = "mapbox_token"
+
+        /** Mapbox refused this run's map: OpenFreeMap until the app restarts or a new token is set. */
+        @Volatile var mapboxRefused = false
+
+        /**
+         * A Mapbox loading error that means it won't serve this token: an auth refusal only. Other style errors (a 3D
+         * model or import failing once, a cancelled load) leave the map working, so they never switch it.
+         */
+        fun refusedBy(message: String) =
+            Regex("""(status( code)?|http)\s*:?\s*40[13]\b|unauthori[sz]ed|forbidden|invalid (access )?token|valid access token""",
+                RegexOption.IGNORE_CASE).containsMatchIn(message)
 
         fun chosen(context: Context): Provider =
-            Provider.parse(Prefs.mapProvider(context)).takeIf { it != Provider.MAPBOX || mapboxAvailable } ?: Provider.OPENFREEMAP
+            Provider.parse(Prefs.mapProvider(context)).takeIf { it != Provider.MAPBOX || mapboxAvailable(context) } ?: Provider.OPENFREEMAP
 
         fun create(context: Context, provider: Provider = chosen(context)): MapEngine = when (provider) {
             Provider.MAPBOX -> MapboxSupport.engine(context)

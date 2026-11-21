@@ -35,6 +35,21 @@ import kotlinx.coroutines.launch
 class SettingsActivity : AppCompatActivity() {
 
     companion object {
+        /**
+         * How well a setting's name matches the search: 3 it starts with it, 2 a word in it does, 1 it's inside a word,
+         * 0 not at all (found by its ⓘ only).
+         */
+        internal fun matchScore(name: String, q: String): Int {
+            val n = name.lowercase().trimStart { !it.isLetterOrDigit() }
+            val i = n.indexOf(q)
+            return when {
+                i < 0 -> 0
+                i == 0 -> 3
+                Regex("""(^|[^\p{L}\p{N}])""" + Regex.escape(q)).containsMatchIn(n) -> 2
+                else -> 1
+            }
+        }
+
         private const val FORGET_OUI_SPY = "Forget the paired board"
         /** The unit after each Watch this place field. */
         private val PLACE_UNITS = mapOf("learn_min" to "min", "min_rssi" to "dBm", "new_window_s" to "s", "gone_min" to "min",
@@ -913,7 +928,7 @@ class SettingsActivity : AppCompatActivity() {
                 "Cell towers: placed where your phone heard each one strongest - an estimate, not the tower's real position.\n\n" +
                 "The map button turns the map: north up, then with your direction of travel, then the 3D driving view - like " +
                 "a car navigation app, your arrow low on the screen, closer in town and further ahead at speed.\n\n" +
-                "3D view angle: how far the driving view leans back; on fast roads it leans up to 10° further (60° at most).\n\n" +
+                "3D view angle: how far the driving view leans back; 0° is straight down. On fast roads it leans up to 10° further, to 60° at most on OpenFreeMap and 85° on Mapbox.\n\n" +
                 "Speedometer: your speed (from the GPS) in the bottom left corner of the live map, and next to it the posted speed " +
                 "limit as a road sign: a red ring, or a \"SPEED LIMIT\" plate where distances are in miles. Your speed turns red " +
                 "above the limit. While you are guided the limits along the route come with it (one more question to the route server " +
@@ -1333,7 +1348,7 @@ class SettingsActivity : AppCompatActivity() {
             "To watch it from afar: every report, and when it starts, has learned and stops, goes to linked Sentinels over " +
             "Bluetooth, the Meshtastic node and the internet relay, encrypted for your group. Whitelisted devices are left out.")
         placeFields.forEach { (key, field) -> withUnit(field, PLACE_UNITS.getValue(key), PLACE_UNIT_WIDEST) }
-        info(binding.mapProviderLabel, "OpenFreeMap: free and open, OpenStreetMap data.\n\nMapbox: Mapbox's Standard map with 3D buildings and day / night light.\n\nThe floating mini map and the Android Auto map always use OpenStreetMap maps.")
+        info(binding.mapProviderLabel, "OpenFreeMap: free and open, OpenStreetMap data.\n\nMapbox: Mapbox's Standard map with 3D buildings and day / night light. If Mapbox refuses the built-in token, add your own free one with Your Mapbox token.\n\nThe floating mini map and the Android Auto map always use OpenStreetMap maps.")
         info(binding.mapAutoRecenterSwitch, "While you drive, the map goes back to your position once you've left it alone for the time set under it (Re-center after).")
         info(binding.mapSpeedometerSwitch, "Your speed and the posted limit in a corner of the map; your speed turns red over the limit.")
         info(binding.mapSpeedLimitLiveSwitch, "Shows the posted limit with no destination too, by asking the route server (Valhalla, OpenStreetMap data) about the road you're on. Your position is sent to it.")
@@ -1502,6 +1517,7 @@ class SettingsActivity : AppCompatActivity() {
      * matching settings and scrolls to the first one. Empty: everything back as it was.
      */
     private fun filterSettings(raw: String) {
+        restoreOrder()
         highlighted.forEach { (v, bg) -> v.background = bg }
         highlighted.clear()
         searchHidden.forEach { if (it.getTag(R.id.search_hidden) == true) { it.setTag(R.id.search_hidden, null); it.visibility = View.VISIBLE } }
@@ -1516,21 +1532,34 @@ class SettingsActivity : AppCompatActivity() {
         val tint = androidx.core.graphics.ColorUtils.setAlphaComponent(
             com.google.android.material.color.MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorPrimary), 0x40)
         var first: View? = null
+        val score = HashMap<SectionUi, Int>()
+        val firstHit = HashMap<SectionUi, View>()
         for (s in sectionUi) {
             val hits = mutableListOf<View>()
-            collectMatches(s.body, q, hits)
+            val nameHits = LinkedHashMap<View, Int>()
+            collectMatches(s.body, q, hits, nameHits)
             val show = hits.isNotEmpty() || s.title.lowercase().contains(q) || s.info.lowercase().contains(q)
             s.row.visibility = if (show) View.VISIBLE else View.GONE
             s.divider?.visibility = s.row.visibility
             if (!show) { s.body.visibility = View.GONE; continue }
+            score[s] = maxOf(matchScore(s.title, q), nameHits.values.maxOrNull() ?: 0)
+            (nameHits.maxByOrNull { it.value }?.key ?: hits.firstOrNull())?.let { firstHit[s] = it }
             s.expand()
             // Only the matching settings, unless the section's own name matches.
-            if (hits.isNotEmpty() && !s.title.lowercase().contains(q)) (s.body as? android.view.ViewGroup)?.let { narrow(it, hits) }
+            if (hits.isNotEmpty() && !s.title.lowercase().contains(q)) (s.body as? android.view.ViewGroup)?.let { narrow(it, hits, nameHits) }
             for (v in hits) {
                 highlighted += v to v.background
                 v.background = android.graphics.drawable.ColorDrawable(tint)
             }
-            if (first == null) first = hits.firstOrNull() ?: s.row
+        }
+        // The best-named settings first, those only their ⓘ mentions last: sections first, then inside them.
+        val ordered = sectionUi.sortedByDescending { score[it] ?: 0 }
+        if (ordered != sectionUi) reorderSections(ordered)
+        for (s in ordered) {
+            if (s.row.visibility != View.VISIBLE) continue
+            first = firstHit[s] ?: s.row
+            s.divider?.visibility = View.GONE // no line above the top section
+            break
         }
         val target = first ?: return
         binding.root.post {
@@ -1550,8 +1579,10 @@ class SettingsActivity : AppCompatActivity() {
      * A match in the label shows the whole setting; a match further down shows the label and that part,
      * looking inside an options panel for just the matching options. Returns whether anything is left.
      */
-    private fun narrow(box: android.view.ViewGroup, hits: List<View>): Boolean {
-        fun holdsHit(v: View) = hits.any { h -> generateSequence(h) { it.parent as? View }.any { it === v } }
+    private fun narrow(box: android.view.ViewGroup, hits: List<View>, byName: Map<View, Int> = emptyMap()): Boolean {
+        fun holds(v: View, h: View) = generateSequence(h) { it.parent as? View }.any { it === v }
+        fun holdsHit(v: View) = hits.any { holds(v, it) }
+        fun score(g: List<View>) = byName.entries.filter { (h, _) -> g.any { holds(it, h) } }.maxOfOrNull { it.value } ?: 0
         fun startsSetting(v: View): Boolean = when (v) {
             is android.widget.RadioGroup -> false
             is android.widget.EditText -> false
@@ -1580,20 +1611,54 @@ class SettingsActivity : AppCompatActivity() {
             for (v in g) {
                 if (v === head) continue
                 val keep = holdsHit(v) && (v !is android.widget.LinearLayout || v is android.widget.RadioGroup ||
-                    v.orientation == android.widget.LinearLayout.HORIZONTAL || narrow(v, hits))
+                    v.orientation == android.widget.LinearLayout.HORIZONTAL || narrow(v, hits, byName))
                 if (keep) shown = true else hide(v)
             }
             if (shown) any = true else head?.let { hide(it) }
         }
+        // The best-named settings first.
+        if (byName.isNotEmpty()) {
+            val moved = groups.sortedByDescending { score(it) }.flatten()
+            val rest = (0 until box.childCount).map { box.getChildAt(it) }.filter { it !in moved }
+            reorder(box, moved + rest)
+        }
         return any
     }
 
+    /** Containers the search reordered, with their children's order before it. */
+    private val searchOrder = mutableListOf<Pair<android.view.ViewGroup, List<View>>>()
+
+    /** Puts [box]'s children in the order [kids], remembering the old one for [restoreOrder]. */
+    private fun reorder(box: android.view.ViewGroup, kids: List<View>) {
+        val before = (0 until box.childCount).map { box.getChildAt(it) }
+        if (before == kids) return
+        if (searchOrder.none { it.first === box }) searchOrder += box to before
+        box.removeAllViews()
+        kids.forEach { box.addView(it) }
+    }
+
+    private fun restoreOrder() {
+        searchOrder.asReversed().forEach { (box, kids) -> box.removeAllViews(); kids.forEach { box.addView(it) } }
+        searchOrder.clear()
+    }
+
+    /** The sections' header rows, dividers and bodies in the order [ordered], where the first of them was. */
+    private fun reorderSections(ordered: List<SectionUi>) {
+        val parent = sectionUi.first().row.parent as? android.view.ViewGroup ?: return
+        val block = { s: SectionUi -> listOfNotNull(s.divider, s.row, s.body).filter { it.parent === parent } }
+        val all = ordered.flatMap(block)
+        val kids = (0 until parent.childCount).map { parent.getChildAt(it) }
+        val at = kids.indexOfFirst { it in all }.takeIf { it >= 0 } ?: return
+        val rest = kids.filter { it !in all }
+        reorder(parent, rest.take(at) + all + rest.drop(at))
+    }
+
     /** Visible settings under [v] whose label, text or hint contains [q]. */
-    private fun collectMatches(v: View, q: String, out: MutableList<View>) {
+    private fun collectMatches(v: View, q: String, out: MutableList<View>, byName: MutableMap<View, Int>) {
         if (v is android.view.ViewGroup) {
             for (i in 0 until v.childCount) {
                 val c = v.getChildAt(i)
-                if (c.visibility == View.VISIBLE) collectMatches(c, q, out)
+                if (c.visibility == View.VISIBLE) collectMatches(c, q, out, byName)
             }
         } else if (v.tag is InfoText) {
             // An ⓘ that matches: the setting beside it lights up.
@@ -1601,7 +1666,7 @@ class SettingsActivity : AppCompatActivity() {
         } else if (v is android.widget.TextView) {
             val text = v.text?.toString().orEmpty().lowercase()
             val hint = v.hint?.toString().orEmpty().lowercase()
-            if (text.contains(q) || hint.contains(q)) out += v
+            if (text.contains(q) || hint.contains(q)) { out += v; byName[v] = maxOf(matchScore(text, q), matchScore(hint, q)) }
         }
     }
 
@@ -2494,17 +2559,26 @@ class SettingsActivity : AppCompatActivity() {
 
     /** Settings > Map > 3D view angle: how far the driving view leans back (flatter = more overhead, steeper = further down the road). */
     private fun setupMapTilt() {
-        fun show(t: Double) {
-            val what = when { t <= 40 -> "flatter, more overhead"; t <= 55 -> "balanced, like Waze"; else -> "steep: far down the road" }
-            binding.map3dTiltText.text = "3D view angle: ${t.toInt()}° · $what"
-        }
-        val t = Prefs.map3dTilt(this)
-        binding.map3dTiltSlider.value = (Math.round(t / 5) * 5).toFloat(); show(t) // the slider crashes on a value off its step
         binding.map3dTiltSlider.setLabelFormatter { "${it.toInt()}°" }
         binding.map3dTiltSlider.addOnChangeListener { _, v, fromUser ->
             if (!fromUser) return@addOnChangeListener
-            Prefs.setMap3dTilt(this, v.toDouble()); show(v.toDouble())
+            Prefs.setMap3dTilt(this, v.toDouble()); showMapTilt(v.toDouble())
         }
+        refreshMapTilt()
+    }
+
+    /** The slider reaches as far as the chosen map tilts: 60° on OpenFreeMap, 85° on Mapbox. */
+    private fun refreshMapTilt() {
+        val max = com.rfsentinel.app.ui.MapEngine.chosen(this).maxTilt
+        val t = Prefs.map3dTilt(this).coerceAtMost(max)
+        binding.map3dTiltSlider.valueTo = max.toFloat()
+        binding.map3dTiltSlider.value = (Math.round(t / 5) * 5).toFloat() // the slider crashes on a value off its step
+        showMapTilt(t)
+    }
+
+    private fun showMapTilt(t: Double) {
+        val what = when { t < 15 -> "top-down"; t <= 40 -> "flatter, more overhead"; t <= 55 -> "balanced, like Waze"; else -> "steep: far down the road" }
+        binding.map3dTiltText.text = "3D view angle: ${t.toInt()}° · $what"
     }
 
     /** Settings > Map > Default zoom: how close the map follows you (the "Waze-like" button is the default). */
@@ -2537,10 +2611,21 @@ class SettingsActivity : AppCompatActivity() {
         val btn = binding.mapProviderButton
         fun show() { btn.text = com.rfsentinel.app.ui.MapEngine.chosen(this).label.substringBefore(" (") + "  ▾" }
         show()
+        // Built here, not in the XML: the Settings binding is at Java's parameter limit.
+        if (com.rfsentinel.app.ui.MapboxSupport.INCLUDED) (btn.parent as android.view.ViewGroup).let { box ->
+            box.addView(com.google.android.material.button.MaterialButton(this, null, android.R.attr.borderlessButtonStyle).apply {
+                text = "Your Mapbox token"
+                setOnClickListener { editMapboxToken { show(); refreshMapTilt() } }
+            }, box.indexOfChild(btn) + 1)
+        }
         btn.setOnClickListener {
             val all = com.rfsentinel.app.ui.MapEngine.Provider.entries
-            if (!com.rfsentinel.app.ui.MapEngine.mapboxAvailable) {
+            if (!com.rfsentinel.app.ui.MapboxSupport.INCLUDED) {
                 Toast.makeText(this, "Mapbox isn't available in this build", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!com.rfsentinel.app.ui.MapEngine.mapboxAvailable(this)) {
+                editMapboxToken { show(); refreshMapTilt() }
                 return@setOnClickListener
             }
             val current = all.indexOf(com.rfsentinel.app.ui.MapEngine.chosen(this))
@@ -2549,11 +2634,43 @@ class SettingsActivity : AppCompatActivity() {
                 .setSingleChoiceItems(all.map { it.label }.toTypedArray(), current) { d, which ->
                     Prefs.setMapProvider(this, all[which].key)
                     show()
+                    refreshMapTilt()
                     d.dismiss()
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+    }
+
+    /** Settings › Map › Your Mapbox token: a free public token (pk.…) from account.mapbox.com, kept encrypted on the phone. */
+    private fun editMapboxToken(done: () -> Unit) {
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val own = com.rfsentinel.app.util.SecureStore.get(this, "mapbox_token").orEmpty()
+        val input = android.widget.EditText(this).apply {
+            setText(own)
+            hint = "pk.…"
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Your Mapbox token")
+            .setMessage((if (com.rfsentinel.app.ui.MapEngine.mapboxRefused) "Mapbox refused the map this time. " else "") +
+                "Make a free account at account.mapbox.com, copy your default public token, which starts with pk., and paste it here. " +
+                "Leave it empty to use the built-in one.")
+            .setView(android.widget.FrameLayout(this).apply { setPadding(pad, 0, pad, 0); addView(input) })
+            .setPositiveButton("Save") { _, _ ->
+                val t = input.text.toString().trim()
+                if (t.isNotEmpty() && !t.startsWith("pk.")) {
+                    Toast.makeText(this, "That isn't a public token: it starts with pk.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                com.rfsentinel.app.ui.MapEngine.setMapboxToken(this, t)
+                if (t.isNotEmpty()) Prefs.setMapProvider(this, com.rfsentinel.app.ui.MapEngine.Provider.MAPBOX.key)
+                done()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showNote(view: android.widget.TextView?, text: String) {
@@ -3278,6 +3395,17 @@ class SettingsActivity : AppCompatActivity() {
         binding.fullscreenSwitch.setOnCheckedChangeListener { _, on ->
             Prefs.setFullscreen(this, on)
             (application as com.rfsentinel.app.RFSentinelApp).applyFullscreen(this) // right away
+        }
+        // Built here, not in the XML: the Settings binding is at Java's parameter limit.
+        (binding.listSizeGroup.parent as android.view.ViewGroup).let { box ->
+            val sw = SwitchMaterial(this).apply {
+                text = "Status colours"
+                bindLive(Prefs.statusColours(this@SettingsActivity)) { Prefs.setStatusColours(this@SettingsActivity, it) }
+            }
+            box.addView(sw, box.indexOfChild(binding.listSizeGroup) + 1)
+            info(sw, "A box on each flagged row while it's in range: green far, yellow nearby, orange close, red very close, " +
+                "and CLOSING when its signal is rising fast. Signal strength only roughly tells distance, so take it as a hint. " +
+                "Alert rows still flash as before.")
         }
         binding.listSizeGroup.checkIndex(Prefs.listSize(this).ordinal)
         binding.listSizeGroup.setOnCheckedChangeListener { group, _ ->

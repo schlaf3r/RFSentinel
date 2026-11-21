@@ -78,7 +78,7 @@ internal class MapboxEngine(private val context: Context) : MapEngine {
     private fun telemetryOff() = runCatching { TelemetryUtils.setEventsCollectionState(false) { } }
 
     init {
-        MapboxOptions.accessToken = BuildConfig.MAPBOX_TOKEN
+        MapboxOptions.accessToken = MapEngine.mapboxToken(context)
         telemetryOff() // before any map exists
     }
 
@@ -98,6 +98,8 @@ internal class MapboxEngine(private val context: Context) : MapEngine {
     override var onLongClick: ((Double, Double) -> Unit)? = null
     override var onUserGesture: (() -> Unit)? = null
     override var onFollowDismissed: (() -> Unit)? = null
+    override var onFailed: (() -> Unit)? = null
+    private var failed = false
 
     override fun onCreate(state: Bundle?) {}
     override fun onStart() { if (!destroyed) view.onStart() }
@@ -120,6 +122,16 @@ internal class MapboxEngine(private val context: Context) : MapEngine {
         view.viewport.options = ViewportOptions.Builder().transitionsToIdleUponUserInteraction(false).build()
         subscriptions += map.subscribeCameraChanged { onCameraMove?.invoke() }
         subscriptions += map.subscribeMapIdle { onIdle?.invoke() }
+        // A revoked token or a blocked account leaves the map blank: say so in the log and hand over to OpenFreeMap.
+        subscriptions += map.subscribeMapLoadingError { e ->
+            val why = e.message.replace(Regex("""access_token=[^&\s"]+"""), "access_token=…")
+            android.util.Log.w("MapboxEngine", "loading error ${e.type}: $why")
+            if (destroyed || failed) return@subscribeMapLoadingError
+            if (!MapEngine.refusedBy(why)) return@subscribeMapLoadingError
+            failed = true
+            MapEngine.mapboxRefused = true
+            view.post { if (!destroyed) onFailed?.invoke() }
+        }
         view.gestures.addOnMapClickListener { point ->
             val p = map.pixelForCoordinate(point)
             onClick?.invoke(p.x.toFloat(), p.y.toFloat())
