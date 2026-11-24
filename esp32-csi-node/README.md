@@ -19,3 +19,13 @@ board's IP, port **3333**. Repeat for more boards.
 - Already run ESPectre/esp-csi firmware you prefer? Point it at the phone instead by emitting either this
   sketch's `CSI_DATA,...,[i,q,...]` line or a precomputed `SENSE,<seq>,<motion 0-100>[,detail]` line over
   TCP; the app accepts both.
+
+## Flash from a browser (no toolchain)
+Don't want to install Arduino? Flash the prebuilt binary straight from a desktop browser:
+
+**https://schlaf3r.github.io/RFSentinel/**
+
+Open it in **desktop Chrome or Edge** (Web Serial — not available on phones), plug in the ESP32-S3, and
+click **Connect & Flash**. Still set your WiFi SSID/password first: either flash, then reflash after
+editing the sketch, or edit and build your own binary. The page serves the firmware compiled from this
+folder by CI.

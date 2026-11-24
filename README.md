@@ -1414,3 +1414,11 @@ passive Bluetooth and WiFi scanning is legal depends on where you are, so check
 your local laws. A detection indicates that a device with a given signature is
 nearby. It is not proof of who is present or what they are doing. This is not
 legal advice.
+
+## Flash the ESP32-S3 CSI node
+The WiFi Sense feature can pull motion data from ESP32-S3 CSI nodes. Flash the node firmware from a
+desktop browser (Chrome/Edge) — no toolchain needed:
+
+**https://schlaf3r.github.io/RFSentinel/**
+
+Source and details: [`esp32-csi-node/`](esp32-csi-node/).
