@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RF War Sentinel — CSI Node Flasher</title>
+<style>
+  :root { --bg:#060013; --fg:#d7e6ff; --dim:#7f8fb3; --neon:#38e0ff; --neon2:#c04bff; --warn:#f5c542; --ok:#3ddc97; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(192,75,255,.18), transparent 60%),
+      radial-gradient(900px 500px at 50% 110%, rgba(56,224,255,.14), transparent 60%), var(--bg);
+    color:var(--fg); font:16px/1.55 ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    display:flex; justify-content:center; padding:32px 18px;
+  }
+  .wrap { width:100%; max-width:680px; }
+  h1 { font-size:22px; letter-spacing:.04em; margin:0 0 4px; }
+  h1 .s { color:var(--neon); } h1 .w { color:var(--neon2); }
+  .sub { color:var(--dim); margin:0 0 24px; }
+  .card { border:1px solid rgba(120,140,190,.28); border-radius:14px; padding:22px; margin:16px 0;
+    background:linear-gradient(180deg, rgba(20,16,40,.6), rgba(10,8,24,.6)); backdrop-filter:blur(4px); }
+  .card h2 { font-size:14px; text-transform:uppercase; letter-spacing:.12em; color:var(--neon); margin:0 0 12px; }
+  ol { margin:0; padding-left:20px; } li { margin:6px 0; }
+  .flash { text-align:center; padding:26px 22px; }
+  esp-web-install-button { --esp-tools-button-color:#060013; --esp-tools-button-text-color:#060013; }
+  esp-web-install-button[install-unsupported] { display:none; }
+  .btn-fallback { display:none; }
+  esp-web-install-button[install-unsupported] + .btn-fallback { display:block; }
+  .pill { display:inline-block; border:1px solid var(--warn); color:var(--warn); border-radius:999px;
+    padding:3px 12px; font-size:12px; letter-spacing:.06em; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .dim { color:var(--dim); }
+  code { color:var(--neon); } a { color:var(--neon2); }
+  .foot { color:var(--dim); font-size:12px; margin-top:22px; text-align:center; }
+  button.install { font:inherit; cursor:pointer; border:0; border-radius:10px; padding:12px 22px;
+    background:linear-gradient(90deg,var(--neon),var(--neon2)); color:#060013; font-weight:700; letter-spacing:.03em; }
+</style>
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>RF <span class="w">War</span> <span class="s">Sentinel</span> · CSI Node Flasher</h1>
+  <p class="sub">Flash the WiFi Sense CSI firmware onto an ESP32-S3 over USB, straight from your browser.</p>
+
+  <div class="card flash">
+    <esp-web-install-button manifest="manifest.json">
+      <button class="install" slot="activate">Connect &amp; Flash ESP32-S3</button>
+      <span slot="unsupported"></span>
+      <span slot="not-allowed"></span>
+    </esp-web-install-button>
+    <div class="btn-fallback">
+      <span class="pill">Browser not supported</span>
+      <p class="dim" style="margin-top:12px">This flasher needs the Web Serial API. Use <b>desktop Chrome, Edge, or Opera</b>.
+      It does <b>not</b> work in Android or iOS browsers, or in Firefox/Safari.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Before you click</h2>
+    <ol>
+      <li>Open this page in <b>desktop Chrome or Edge</b>. <span class="dim">(Web Serial isn't available on phones.)</span></li>
+      <li>Plug the ESP32-S3 into the computer with a <b>data</b> USB cable (not charge-only).</li>
+      <li>Click <b>Connect &amp; Flash</b> and pick the board's serial port in the browser prompt.</li>
+      <li>If it can't connect, hold the board's <b>BOOT</b> button, tap <b>RESET</b>, release BOOT, then retry — that forces download mode.</li>
+    </ol>
+    <p class="dim">Flashing erases the board and writes the CSI node firmware at offset 0. It takes under a minute.</p>
+  </div>
+
+  <div class="card">
+    <h2>After flashing</h2>
+    <ol>
+      <li>Open the board's serial monitor at <code>115200</code> to see its IP, or check your router.</li>
+      <li>In RF War Sentinel: long-press a WiFi access point → <b>WiFi Sense (motion)</b> → <b>Add CSI node</b> → enter the board's IP, port <code>3333</code>.</li>
+      <li class="dim">Set your WiFi SSID/password in the sketch before flashing, or the node can't join the network. Edit <code>esp32-csi-node.ino</code> and reflash if needed.</li>
+    </ol>
+  </div>
+
+  <p class="foot">Firmware built from <code>esp32-csi-node/</code> in the repo · receive-only CSI sensing · nothing is transmitted beyond normal WiFi join.</p>
+</div>
+</body>
+</html>

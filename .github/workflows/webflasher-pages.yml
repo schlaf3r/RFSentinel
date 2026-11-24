@@ -1,0 +1,63 @@
+# Compiles the ESP32-S3 CSI firmware and deploys the web flasher (webflasher/ + fresh firmware.bin)
+# to GitHub Pages. Needs Pages enabled once: repo Settings → Pages → Source → GitHub Actions.
+name: Web flasher (Pages)
+
+on:
+  push:
+    branches: [wigle-log, main]
+    paths:
+      - 'esp32-csi-node/**'
+      - 'webflasher/**'
+      - '.github/workflows/webflasher-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s
+          echo "$PWD/bin" >> "$GITHUB_PATH"
+      - name: Install ESP32 core
+        run: |
+          arduino-cli config init
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Compile for ESP32-S3
+        run: arduino-cli compile --fqbn esp32:esp32:esp32s3 --export-binaries esp32-csi-node
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          cp webflasher/index.html webflasher/manifest.json site/
+          merged=$(find esp32-csi-node/build -name '*.merged.bin' | head -1)
+          if [ -z "$merged" ]; then echo "No merged.bin produced by the build"; find esp32-csi-node/build -name '*.bin'; exit 1; fi
+          cp "$merged" site/firmware.bin
+          echo "firmware: $merged ($(du -h site/firmware.bin | cut -f1))"
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
